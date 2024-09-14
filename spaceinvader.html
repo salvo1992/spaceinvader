@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Invaders</title>
+    <style>
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: black; }
+        canvas { background-color: #000; display: block; }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        .arrow {
+            width: 50px;
+            height: 50px;
+            background-color: gray;
+            margin: 0 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            color: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="controls">
+        <div class="arrow" id="left">◄</div>
+        <div class="arrow" id="right">►</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const context = canvas.getContext('2d');
+
+        let player, aliens = [], bullets = [], gameOver = false, gameWon = false;
+        let movingLeft = false, movingRight = false;
+
+        class Player {
+            constructor() {
+                this.width = 50;
+                this.height = 20;
+                this.x = (canvas.width - this.width) / 2;
+                this.y = canvas.height - this.height - 10;
+                this.speed = 7;
+            }
+            draw() {
+                context.fillStyle = 'green';
+                context.fillRect(this.x, this.y, this.width, this.height);
+            }
+            move() {
+                if (movingLeft && this.x > 0) {
+                    this.x -= this.speed;
+                } else if (movingRight && this.x + this.width < canvas.width) {
+                    this.x += this.speed;
+                }
+            }
+        }
+
+        class Alien {
+            constructor(x, y) {
+                this.width = 40;
+                this.height = 20;
+                this.x = x;
+                this.y = y;
+                this.speed = 1;
+                this.isHit = false;
+            }
+            draw() {
+                if (!this.isHit) {
+                    context.fillStyle = 'red';
+                    context.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+            move() {
+                this.x += this.speed;
+                if (this.x + this.width >= canvas.width || this.x <= 0) {
+                    this.speed = -this.speed;
+                    this.y += 20;
+                }
+            }
+        }
+
+        class Bullet {
+            constructor(x, y, direction) {
+                this.width = 5;
+                this.height = 10;
+                this.x = x;
+                this.y = y;
+                this.speed = direction === 'up' ? -5 : 5;
+            }
+            draw() {
+                context.fillStyle = 'white';
+                context.fillRect(this.x, this.y, this.width, this.height);
+            }
+            move() {
+                this.y += this.speed;
+            }
+        }
+
+        function init() {
+            player = new Player();
+            aliens = [];
+            bullets = [];
+            for (let i = 0; i < 5; i++) {
+                for (let j = 0; j < 10; j++) {
+                    aliens.push(new Alien(j * 60 + 50, i * 40 + 30));
+                }
+            }
+            gameOver = false;
+            gameWon = false;
+            autoShoot();
+            gameLoop();
+        }
+
+        function autoShoot() {
+            setInterval(() => {
+                bullets.push(new Bullet(player.x + player.width / 2, player.y, 'up'));
+            }, 1000);
+        }
+
+        document.getElementById('left').addEventListener('mousedown', () => movingLeft = true);
+        document.getElementById('right').addEventListener('mousedown', () => movingRight = true);
+        document.getElementById('left').addEventListener('mouseup', () => movingLeft = false);
+        document.getElementById('right').addEventListener('mouseup', () => movingRight = false);
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowLeft') {
+                movingLeft = true;
+            } else if (event.key === 'ArrowRight') {
+                movingRight = true;
+            }
+        });
+
+        document.addEventListener('keyup', function(event) {
+            if (event.key === 'ArrowLeft') {
+                movingLeft = false;
+            } else if (event.key === 'ArrowRight') {
+                movingRight = false;
+            }
+        });
+
+        function detectCollision(bullet, alien) {
+            return bullet.x < alien.x + alien.width &&
+                   bullet.x + bullet.width > alien.x &&
+                   bullet.y < alien.y + alien.height &&
+                   bullet.y + bullet.height > alien.y;
+        }
+
+        function checkGameStatus() {
+            const aliveAliens = aliens.filter(alien => !alien.isHit);
+            if (aliveAliens.length === 0) {
+                gameWon = true;
+                alert("Hai vinto!");
+                resetGame();
+            }
+        }
+
+        function resetGame() {
+            setTimeout(init, 1000);  // Reset dopo un secondo
+        }
+
+        function gameLoop() {
+            if (gameOver || gameWon) return;
+
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            player.move();
+            player.draw();
+
+            for (let alien of aliens) {
+                alien.move();
+                alien.draw();
+            }
+
+            for (let i = 0; i < bullets.length; i++) {
+                const bullet = bullets[i];
+                bullet.move();
+                bullet.draw();
+
+                // Controlla collisione con gli alieni
+                for (let j = 0; j < aliens.length; j++) {
+                    const alien = aliens[j];
+                    if (!alien.isHit && detectCollision(bullet, alien)) {
+                        alien.isHit = true;  // L'alieno viene colpito
+                        bullets.splice(i, 1);  // Rimuovi il proiettile
+                        i--;
+                        break;
+                    }
+                }
+            }
+
+            checkGameStatus();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        init();
+    </script>
+</body>
+</html>
