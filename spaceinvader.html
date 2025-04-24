@@ -5,8 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Space Invaders</title>
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: black; }
-        canvas { background-color: #000; display: block; }
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: black;
+        }
+        canvas {
+            background-color: #000;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
         #controls {
             position: absolute;
             bottom: 20px;
@@ -17,43 +29,76 @@
         .arrow {
             width: 50px;
             height: 50px;
-            background-color: gray;
+            background-color: transparent; /* Rendi il background trasparente */
             margin: 0 10px;
             display: flex;
             justify-content: center;
             align-items: center;
             font-size: 30px;
-            color: white;
+            color: white; /* Colore del simbolo */
             cursor: pointer;
+            border: none; /* Rimuovi eventuali bordi */
+        }
+        .arrow:active {
+            opacity: 0.5; /* Rendi trasparenti quando cliccati */
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: white;
+        }
+        #hud span, #hud button {
+            margin: 0 10px;
+            font-size: 20px;
+        }
+        .alienImage {
+            background-color: black;
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <canvas id="gameCanvas"></canvas>
     <div id="controls">
-        <div class="arrow" id="left">◄</div>
-        <div class="arrow" id="right">►</div>
+        <button class="arrow" id="left">≥</button>
+        <button class="arrow" id="right">≥</button>
+    </div>
+    <div id="hud">
+        <span id="level">Level: 1</span>
+        <span id="score">Score: 0</span>
+        <button id="startBtn">Start</button>
+        <button id="exitBtn">Exit</button>
     </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const context = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
         let player, aliens = [], bullets = [], gameOver = false, gameWon = false;
         let movingLeft = false, movingRight = false;
+        let level = 1, score = 0, isPaused = true;
+
+        const playerImage = new Image();
+        playerImage.src = 'https://clipart-library.com/images/kcKboL5cj.jpg'; // Inserisci il percorso corretto
+        const alienImage = new Image();
+        alienImage.src = 'https://th.bing.com/th/id/R.d22cd20c4646cffc2fee0ae2feecb1c5?rik=D0Kr2NAgMU2Lwg&riu=http%3a%2f%2fwww.tenasaku.com%2ftenasaku%2ftepipi%2fresource%2fspace_invader.png&ehk=0mnsBpPyubqZYxyqkRRMJrsYtHSwkXeXM8EFk5kLE14%3d&risl=&pid=ImgRaw&r=0'; // Inserisci il percorso corretto
 
         class Player {
             constructor() {
-                this.width = 50;
-                this.height = 20;
+                this.width = 70;
+                this.height = 30;
                 this.x = (canvas.width - this.width) / 2;
-                this.y = canvas.height - this.height - 10;
+                this.y = canvas.height - this.height - 20;
                 this.speed = 7;
             }
+
             draw() {
-                context.fillStyle = 'green';
-                context.fillRect(this.x, this.y, this.width, this.height);
+                context.drawImage(playerImage, this.x, this.y, this.width, this.height);
             }
+
             move() {
                 if (movingLeft && this.x > 0) {
                     this.x -= this.speed;
@@ -65,35 +110,41 @@
 
         class Alien {
             constructor(x, y) {
-                this.width = 40;
-                this.height = 20;
+                this.width = 60;
+                this.height = 40;
                 this.x = x;
                 this.y = y;
-                this.speed = 1;
+                this.speed = 1 + level * 0.5;
                 this.isHit = false;
             }
+
             draw() {
                 if (!this.isHit) {
-                    context.fillStyle = 'red';
-                    context.fillRect(this.x, this.y, this.width, this.height);
+                    context.drawImage(alienImage, this.x, this.y, this.width, this.height);
                 }
             }
+
             move() {
                 this.x += this.speed;
                 if (this.x + this.width >= canvas.width || this.x <= 0) {
                     this.speed = -this.speed;
-                    this.y += 20;
+                    this.y += 30;
+                }
+                if (this.y + this.height >= player.y) {
+                    gameOver = true;
+                    alert("Game Over");
+                    resetGame();
                 }
             }
         }
 
         class Bullet {
-            constructor(x, y, direction) {
+            constructor(x, y) {
                 this.width = 5;
                 this.height = 10;
                 this.x = x;
                 this.y = y;
-                this.speed = direction === 'up' ? -5 : 5;
+                this.speed = -5; // Proiettile sempre va in alto
             }
             draw() {
                 context.fillStyle = 'white';
@@ -110,18 +161,21 @@
             bullets = [];
             for (let i = 0; i < 5; i++) {
                 for (let j = 0; j < 10; j++) {
-                    aliens.push(new Alien(j * 60 + 50, i * 40 + 30));
+                    aliens.push(new Alien(j * 80 + 50, i * 60 + 30));
                 }
             }
             gameOver = false;
             gameWon = false;
+            updateHUD();
             autoShoot();
             gameLoop();
         }
 
         function autoShoot() {
             setInterval(() => {
-                bullets.push(new Bullet(player.x + player.width / 2, player.y, 'up'));
+                if (!isPaused) {
+                    bullets.push(new Bullet(player.x + player.width / 2, player.y));
+                }
             }, 1000);
         }
 
@@ -129,6 +183,11 @@
         document.getElementById('right').addEventListener('mousedown', () => movingRight = true);
         document.getElementById('left').addEventListener('mouseup', () => movingLeft = false);
         document.getElementById('right').addEventListener('mouseup', () => movingRight = false);
+
+        document.getElementById('left').addEventListener('touchstart', () => movingLeft = true);
+        document.getElementById('right').addEventListener('touchstart', () => movingRight = true);
+        document.getElementById('left').addEventListener('touchend', () => movingLeft = false);
+        document.getElementById('right').addEventListener('touchend', () => movingRight = false);
 
         document.addEventListener('keydown', function(event) {
             if (event.key === 'ArrowLeft') {
@@ -146,6 +205,24 @@
             }
         });
 
+        document.getElementById('startBtn').addEventListener('click', () => {
+            isPaused = !isPaused;
+            if (!isPaused) {
+                gameLoop();
+            }
+        });
+
+        document.getElementById('exitBtn').addEventListener('click', () => {
+            gameOver = true;
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            alert("Hai chiuso il gioco");
+        });
+
+        function updateHUD() {
+            document.getElementById('level').textContent = `Level: ${level}`;
+            document.getElementById('score').textContent = `Score: ${score}`;
+        }
+
         function detectCollision(bullet, alien) {
             return bullet.x < alien.x + alien.width &&
                    bullet.x + bullet.width > alien.x &&
@@ -156,21 +233,22 @@
         function checkGameStatus() {
             const aliveAliens = aliens.filter(alien => !alien.isHit);
             if (aliveAliens.length === 0) {
-                gameWon = true;
-                alert("Hai vinto!");
+                level++;
+                alert("Hai superato il livello!");
                 resetGame();
             }
         }
 
         function resetGame() {
-            setTimeout(init, 1000);  // Reset dopo un secondo
+            score += 100;
+            updateHUD();
+            setTimeout(init, 1000);
         }
 
         function gameLoop() {
-            if (gameOver || gameWon) return;
+            if (gameOver || gameWon || isPaused) return;
 
             context.clearRect(0, 0, canvas.width, canvas.height);
-
             player.move();
             player.draw();
 
@@ -184,12 +262,13 @@
                 bullet.move();
                 bullet.draw();
 
-                // Controlla collisione con gli alieni
                 for (let j = 0; j < aliens.length; j++) {
                     const alien = aliens[j];
                     if (!alien.isHit && detectCollision(bullet, alien)) {
-                        alien.isHit = true;  // L'alieno viene colpito
-                        bullets.splice(i, 1);  // Rimuovi il proiettile
+                        alien.isHit = true;
+                        bullets.splice(i, 1);
+                        score += 10;
+                        updateHUD();
                         i--;
                         break;
                     }
@@ -197,11 +276,17 @@
             }
 
             checkGameStatus();
-
             requestAnimationFrame(gameLoop);
         }
 
         init();
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            player.x = (canvas.width - player.width) / 2; // Reimposta la posizione del giocatore
+        });
     </script>
 </body>
 </html>
+
